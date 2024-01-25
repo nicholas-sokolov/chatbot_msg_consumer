@@ -6,6 +6,8 @@ from queue import Queue
 from threading import Thread
 
 import redis.asyncio as redis
+from celery import Celery, shared_task
+from celery.app.task import BaseTask
 from fastapi import (
     FastAPI,
     Request,
@@ -33,7 +35,26 @@ viber_response_handler = Thread(target=viber_validate_response, args=(output_que
 viber_response_handler.start()
 
 # Initialize the Redis client
-redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+redis_client = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
+
+celery_app = Celery('main')
+celery_app.config_from_object('celery_config')
+
+
+@shared_task(
+    bind=True,
+    rate_limit="8/s",
+    time_limit=120,  # 2 minutes
+    soft_time_limit=60,  # 1 minute
+    ignore_result=True,
+)
+def send_message_to_server(self: BaseTask, msg: dict):
+    logger.info("Received message: %s", self.request.id)
+
+    sender_id: str = msg.get("sender").get("id", "")
+    message: dict = msg.get("message", {})
+    logger.info("Received message: %s, from user: %s", message, sender_id)
+    return
 
 
 @asynccontextmanager
@@ -77,12 +98,14 @@ async def viber_webhook(request: Request):
 
         hash_key = sender_id + json.dumps(message)
         cache_ttl: int = 300  # 5 minutes
-        if not redis_client.get(hash_key):
+        if not await redis_client.get(hash_key):
             await redis_client.setex(hash_key, cache_ttl, "1")
-
+            logger.warning("Message for user %s does not exist", sender_id)
+            send_message_to_server.s(data).apply_async()
         else:
+            pass
             # For debug purposes
-            logger.warning("Message for user %s exists", sender_id)
+            # logger.warning("Message for user %s exists", sender_id)
 
     elif event == "webhook":
         # Response 200 OK, skip this event

@@ -1,9 +1,11 @@
+import json
 import logging
 import sys
 from contextlib import asynccontextmanager
 from queue import Queue
 from threading import Thread
 
+import redis.asyncio as redis
 from fastapi import (
     FastAPI,
     Request,
@@ -29,6 +31,9 @@ viber_message_handler.start()
 # Validate viber response
 viber_response_handler = Thread(target=viber_validate_response, args=(output_queue,), daemon=True)
 viber_response_handler.start()
+
+# Initialize the Redis client
+redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
 
 @asynccontextmanager
@@ -64,8 +69,20 @@ async def viber_webhook(request: Request):
         input_queue.put(user_id)
 
     elif event == "message":
-        # Handle message events
-        pass
+        sender_id: str = data.get("sender").get("id", "")
+        message: dict = data.get("message", {})
+        # we need to get hash sha256 from sender_id + message
+        # if hash is in redis, then skip this event
+        # else put sender_id + message to redis with ttl 5 mi
+
+        hash_key = sender_id + json.dumps(message)
+        cache_ttl: int = 300  # 5 minutes
+        if not redis_client.get(hash_key):
+            await redis_client.setex(hash_key, cache_ttl, "1")
+
+        else:
+            # For debug purposes
+            logger.warning("Message for user %s exists", sender_id)
 
     elif event == "webhook":
         # Response 200 OK, skip this event

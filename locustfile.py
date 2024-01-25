@@ -1,10 +1,12 @@
+import random
+
 from locust import HttpUser, task, between
 
 
 class QuickstartUser(HttpUser):
     wait_time = between(1, 5)
 
-    @task
+    @task(8)
     def conversation_started(self):
         self.client.post(
             "/viber/webhook",
@@ -26,7 +28,7 @@ class QuickstartUser(HttpUser):
             },
         )
 
-    @task
+    @task(1)
     def webhook(self):
         self.client.post(
             "/viber/webhook",
@@ -38,7 +40,7 @@ class QuickstartUser(HttpUser):
             },
         )
 
-    @task
+    @task(1)
     def message(self):
         self.client.post(
             "/viber/webhook",
@@ -48,7 +50,7 @@ class QuickstartUser(HttpUser):
                 "chat_hostname": "SN-CALLBACK-21_",
                 "message_token": 5916837654388304302,
                 "sender": {
-                    "id": "12345",
+                    "id": str(random.randint(1, 999)),
                     "name": "Sergey Rùdnev",
                     "avatar": "https://media-direct.cdn.viber.com/download_photo?dlid=MFojMvbS52ZImnxNQUHeU3zomFr47zbnIu6Zj613oDvnQmtgG--p0H_1mI7PPH10Y89AEuUTXTC_7k-j9elWuN6kQ3k1-uJgNEZQ_oJCpt84AB7tGnB4YiFOfeNmFb6bH4sCLw&fltp=jpg&imsz=0000",
                     "language": "en",
@@ -56,7 +58,7 @@ class QuickstartUser(HttpUser):
                     "api_version": 8
                 },
                 "message": {
-                    "text": "/start",
+                    "text": random.choice(["/start", "/help", "/stop"]),
                     "type": "text"
                 },
                 "silent": False

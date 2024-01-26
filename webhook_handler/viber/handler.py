@@ -26,16 +26,16 @@ def send_broadcast(user_id_list: list[str]):
     return conversation_started_response
 
 
-def viber_message_consumer(input_queue: Queue, output_queue: Queue):
+def viber_message_consumer(in_queue: Queue, out_queue: Queue):
     """Handle Viber events with high performance
 
-    Put user_id to input_queue and after combine them to list of users and send broadcast message
+    Put user_id to in_queue and after combine them to list of users and send broadcast message
     Use ThreadPoolExecutor to send broadcast message in parallel
 
-    Put Future to output_queue and validate response in another thread
+    Put Future to out_queue and validate response in another thread
 
-    :param input_queue: Queue with user_id
-    :param output_queue: Queue with Future
+    :param in_queue: Queue with user_id
+    :param out_queue: Queue with Future
     :return: None
     """
     executor = ThreadPoolExecutor()
@@ -45,7 +45,7 @@ def viber_message_consumer(input_queue: Queue, output_queue: Queue):
 
     def _send_message(recipients: list[str]) -> tuple[float, list[str]]:
         future = executor.submit(send_broadcast, recipients)
-        output_queue.put(future)
+        out_queue.put(future)
         return time.time(), []
 
     # Viber has limit 300 users per broadcast message
@@ -58,7 +58,7 @@ def viber_message_consumer(input_queue: Queue, output_queue: Queue):
 
     while True:
         try:
-            user_id = input_queue.get(block=False)
+            user_id = in_queue.get(block=False)
         except Empty:
             if len(user_id_list):
                 # Send message to users while queue is empty and wait next message
@@ -83,21 +83,21 @@ def viber_message_consumer(input_queue: Queue, output_queue: Queue):
         ]):
             last_sent_time, user_id_list = _send_message(user_id_list)
 
-        input_queue.task_done()
+        in_queue.task_done()
 
 
-def viber_validate_response(input_queue: Queue):
+def viber_validate_response(in_queue: Queue):
     """Validate response from Viber API
 
     When we send broadcast message to list of users, we get Future object.
     This thread get Future from queue and validate response.
 
-    :param input_queue: Queue with Future
+    :param in_queue: Queue with Future
     :return: None
     """
     while True:
         try:
-            future: Future | None = input_queue.get(block=False)
+            future: Future | None = in_queue.get(block=False)
         except Empty:
             time.sleep(0.5)
             continue
@@ -115,4 +115,4 @@ def viber_validate_response(input_queue: Queue):
             if not mock_result:
                 logger.error("Invalid response: %s", result)
 
-        input_queue.task_done()
+        in_queue.task_done()

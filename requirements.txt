@@ -1,0 +1,8 @@
+celery==5.3.6
+fastapi==0.109.0
+gevent
+locust==2.20.1
+python-dotenv==1.0.1
+psutil==5.9.8
+redis==5.0.1
+uvicorn==0.27.0

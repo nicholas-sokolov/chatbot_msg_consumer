@@ -9,10 +9,13 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
+redis_host = os.environ.get('REDIS_HOST', 'localhost')
+redis_port = os.environ.get('REDIS_PORT', '6379')
+
 celery_app = Celery(
     'celery_worker',
-    broker=os.environ.get('CELERY_BROKER_URL'),
-    backend=os.environ.get('CELERY_RESULT_BACKEND')
+    broker=f'redis://{redis_host}:{redis_port}/0',
+    backend=f'redis://{redis_host}:{redis_port}/0',
 )
 
 
